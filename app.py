@@ -19,7 +19,7 @@ engine = create_engine("sqlite:///hawaii.sqlite")
 base = automap_base()
 base.prepare(engine, reflect=True)
 
-# Save references to each table
+# # Save references to each table
 measurement = base.classes.measurement
 station = base.classes.station
 
@@ -47,44 +47,42 @@ def precip():
     precipitation = {date: prcp for date, prcp in result}
     return jsonify(precipitation)
 
-#Route for stations page 
 @app.route("/api/stations")
 def stations():
-    station_data = session.query(station).all()
+    """Return a list of stations."""
+    results = session.query(station.station).all()
+    stations = list(np.ravel(results))
+    return jsonify(stations=stations)
 
-    stations_list = []
-    for station in station_data:
-        station_dict = {}
-        station_dict["id"] = station.id
-        station_dict["station"] = station.station
-        station_dict["name"] = station.name
-        station_dict["latitude"] = station.latitude
-        station_dict["longitude"] = station.longitude
-        station_dict["elevation"] = station.elevation
-        stations_list.append(station_dict)
 
-    return jsonify(stations_list)
-
-#Route for monthly temperature oberservations page 
 @app.route("/api/tobs")
-def monthly_temp():
+def temp_monthly():
     prev_year = dt.date(2017, 8, 23) - dt.timedelta(days=365)
-    result = session.query(measurement.tobs).filter(measurement.station == 'USC00519281').filter(measurement.date >= prev_year).all()
-    tobs = list(np.ravel(result))
-    return jsonify(tobs=tobs)
 
-#Route for start and start/end pages 
-@app.route("/api/<start>")
-def start(start=None):
-    start = session.query(measurement.date, func.min(measurement.tobs), func.avg(measurement.tobs), func.max(measurement.tobs)).filter(measurement.date >= start).group_by(measurement.date).all()
-    start_list=list(start)
-    return jsonify(start_list)
+    results = session.query(measurement.tobs).\
+        filter(measurement.station == 'USC00519281').\
+        filter(measurement.date >= prev_year).all()
+    temps = list(np.ravel(results))
+    return jsonify(temps=temps)
 
+
+@app.route("/api/temp/<start>")
 @app.route("/api/temp/<start>/<end>")
-def start_end(start=None, end=None):
-    between_dates = session.query(measurement.date, func.min(measurement.tobs), func.avg(measurement.tobs), func.max(measurement.tobs)).filter(measurement.date >= start).filter(measurement.date <= end).group_by(measurement.date).all()
-    between_dates_list=list(between_dates)
-    return jsonify(between_dates_list)
+def stats(start=None, end=None):
+    sel = [func.min(measurement.tobs), func.avg(measurement.tobs), func.max(measurement.tobs)]
+
+    if not end:
+        results = session.query(*sel).\
+            filter(measurement.date >= start).all()
+        temps = list(np.ravel(results))
+        return jsonify(temps)
+
+    results = session.query(*sel).\
+        filter(measurement.date >= start).\
+        filter(measurement.date <= end).all()
+    temps = list(np.ravel(results))
+    return jsonify(temps=temps)
+
 
 if __name__ == '__main__':
     app.run()
